@@ -546,6 +546,12 @@ func (e *Encoder) encodeMap(by []byte, m reflect.Value, isRefNext bool, strTable
 
 func (e *Encoder) encodeStruct(by []byte, st reflect.Value, strTable map[string]int, ptrTable map[uintptr]int) ([]byte, error) {
 	tags := e.tcache.Get(st)
+	fieldsToSkip := 0
+	for _, i := range tags {
+		if i.omitEmpty && isEmptyValue(st.Field(i.id)) {
+			fieldsToSkip++
+		}
+	}
 
 	by = append(by, typeOBJECT)
 	by = e.encodeBytes(by, []byte(st.Type().Name()), true, strTable)
@@ -556,12 +562,16 @@ func (e *Encoder) encodeStruct(by []byte, st reflect.Value, strTable map[string]
 	}
 
 	by = append(by, typeHASH)
-	by = varint(by, uint(len(tags)))
+	by = varint(by, uint(len(tags)-fieldToSkip))
 
 	var err error
 	for f, i := range tags {
+		fv := st.Field(i.id)
+		if i.omitEmpty && isEmptyValue(fv) {
+			continue
+		}
 		by = e.encodeString(by, f, true, strTable)
-		if by, err = e.encode(by, st.Field(i), false, false, strTable, ptrTable); err != nil {
+		if by, err = e.encode(by, fv, false, false, strTable, ptrTable); err != nil {
 			return nil, err
 		}
 	}
