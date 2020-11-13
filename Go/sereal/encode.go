@@ -565,7 +565,7 @@ func (e *Encoder) encodeStruct(by []byte, st reflect.Value, strTable map[string]
 	}
 
 	by = append(by, typeHASH)
-	by = varint(by, uint(len(tags)-fieldToSkip))
+	by = varint(by, uint(len(tags)-fieldsToSkip))
 
 	var err error
 	for f, i := range tags {
