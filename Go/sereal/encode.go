@@ -21,6 +21,7 @@ type Encoder struct {
 	DisableDedup         bool       // should we disable deduping of class names and hash keys
 	DisableFREEZE        bool       // should we disable the FREEZE tag, which calls MarshalBinary
 	ExpectedSize         uint       // give a hint to encoder about expected size of encoded data
+	StructAsMap          bool       // convert struct as map
 	version              int        // default version to encode
 	tcache               tagsCache
 }
@@ -553,8 +554,10 @@ func (e *Encoder) encodeStruct(by []byte, st reflect.Value, strTable map[string]
 		}
 	}
 
-	by = append(by, typeOBJECT)
-	by = e.encodeBytes(by, []byte(st.Type().Name()), true, strTable)
+	if !e.StructAsMap {
+		by = append(by, typeOBJECT)
+		by = e.encodeBytes(by, []byte(st.Type().Name()), true, strTable)
+	}
 
 	if e.PerlCompat {
 		// must be a reference
