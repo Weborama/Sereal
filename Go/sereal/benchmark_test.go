@@ -3,7 +3,7 @@ package sereal_test
 import (
 	"testing"
 
-	"github.com/Sereal/Sereal/Go/sereal"
+	"github.com/Weborama/Sereal/Go/sereal"
 )
 
 var solarSystemMeta = map[string]interface{}{

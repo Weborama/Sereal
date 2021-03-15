@@ -4,8 +4,9 @@ import (
 	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"github.com/Sereal/Sereal/Go/sereal"
 	mrand "math/rand"
+
+	"github.com/Weborama/Sereal/Go/sereal"
 )
 
 func main() {

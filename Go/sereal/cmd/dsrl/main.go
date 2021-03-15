@@ -9,7 +9,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/Sereal/Sereal/Go/sereal"
+	"github.com/Weborama/Sereal/Go/sereal"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dchest/siphash"
 	"github.com/dgryski/go-ddmin"
