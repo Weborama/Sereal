@@ -1204,6 +1204,12 @@ func setInt(ptr reflect.Value, i int) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		ptr.SetUint(uint64(i))
 
+	case reflect.Bool:
+		if i == 0 {
+			ptr.SetBool(false)
+		} else {
+			ptr.SetBool(true)
+		}
 	default:
 		panic(&reflect.ValueError{Method: "sereal.setInt", Kind: ptr.Kind()})
 	}
