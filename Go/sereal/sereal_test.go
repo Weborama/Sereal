@@ -788,54 +788,75 @@ func TestStructAsMap(t *testing.T) {
 		},
 	}
 
-	for _, compat := range []bool{false, true} {
-		for _, v := range tests {
-			eMap := Encoder{PerlCompat: compat}
-			eStructAsMap := Encoder{PerlCompat: compat, StructAsMap: true}
-			d := Decoder{}
-
-			var name string
-			if compat {
-				name = "compat_" + v.what
-			} else {
-				name = v.what
-			}
-
-			t.Run(name, func(t *testing.T) {
-				//encode both
-				rinputMap := reflect.ValueOf(v.inputMap)
-				xMap, err := eMap.Marshal(rinputMap.Interface())
-				if err != nil {
-					t.Errorf("error marshalling %s: %s\n", v.what, err)
-					return
-				}
-				rinputStruct := reflect.ValueOf(v.inputStruct)
-				xStruct, err := eStructAsMap.Marshal(rinputStruct.Interface())
-				if err != nil {
-					t.Errorf("error marshalling %s: %s\n", v.what, err)
-					return
-				}
-				//Decode
-				routMap := reflect.New(reflect.TypeOf(v.inputMap))
-				err = d.Unmarshal(xMap, routMap.Interface())
-				if err != nil {
-					t.Errorf("error unmarshalling %s: %s\n", v.what, err)
-					return
-				}
-				routStruct := reflect.New(reflect.TypeOf(v.inputMap)) //Decode like a map
-				err = d.Unmarshal(xStruct, routStruct.Interface())
-				if err != nil {
-					t.Errorf("error unmarshalling %s: %s\n", v.what, err)
-					return
-				}
-				if !reflect.DeepEqual(routStruct.Elem().Interface(), routMap.Elem().Interface()) {
-					t.Errorf("roundtrip mismatch for %s: got: %#v expected: %#v\n", v.what, routStruct.Elem().Interface(), routMap.Elem().Interface())
-				}
-				if !reflect.DeepEqual(routStruct.Elem().Interface(), rinputMap.Interface()) {
-					t.Errorf("source mismatch for %s: got: %#v expected: %#v\n", v.what, routStruct.Elem().Interface(), rinputMap.Interface())
-				}
-			})
+	for _, asMap := range []bool{false, true} {
+		nameAsMap := "NotAsMap"
+		if asMap {
+			nameAsMap = "AsMap"
 		}
+		t.Run(nameAsMap, func(t *testing.T) {
+			for _, compat := range []bool{false, true} {
+				for _, v := range tests {
+					eMap := Encoder{PerlCompat: compat}
+					eStructAsMap := Encoder{PerlCompat: compat, StructAsMap: asMap}
+					d := Decoder{}
+
+					var name string
+					if compat {
+						name = "compat_" + v.what
+					} else {
+						name = v.what
+					}
+
+					t.Run(name, func(t *testing.T) {
+						//encode both
+						rinputMap := reflect.ValueOf(v.inputMap)
+						xMap, err := eMap.Marshal(rinputMap.Interface())
+						if err != nil {
+							t.Errorf("error marshalling %s: %s\n", v.what, err)
+							return
+						}
+						rinputStruct := reflect.ValueOf(v.inputStruct)
+						xStruct, err := eStructAsMap.Marshal(rinputStruct.Interface())
+						if err != nil {
+							t.Errorf("error marshalling %s: %s\n", v.what, err)
+							return
+						}
+
+						//Decode
+						routMap := reflect.New(reflect.TypeOf(v.inputMap))
+						err = d.Unmarshal(xMap, routMap.Interface())
+						if err != nil {
+							t.Errorf("error unmarshalling %s: %s\n", v.what, err)
+							return
+						}
+						routStruct := reflect.New(reflect.TypeOf(v.inputStruct))
+						err = d.Unmarshal(xStruct, routStruct.Interface())
+						if err != nil {
+							t.Errorf("error unmarshalling %s: %s\n", v.what, err)
+							return
+						}
+						routStructAsMap := reflect.New(reflect.TypeOf(v.inputMap)) //Decode like a map
+						err = d.Unmarshal(xStruct, routStructAsMap.Interface())
+						if err != nil {
+							t.Errorf("error unmarshalling %s: %s\n", v.what, err)
+							return
+						}
+						if !reflect.DeepEqual(routStructAsMap.Elem().Interface(), routMap.Elem().Interface()) {
+							t.Errorf("roundtrip mismatch for %s: got: %#v expected: %#v\n", v.what, routStructAsMap.Elem().Interface(), routMap.Elem().Interface())
+						}
+						if !reflect.DeepEqual(routMap.Elem().Interface(), rinputMap.Interface()) {
+							t.Errorf("source mismatch for %s: got: %#v expected: %#v\n", v.what, routMap.Elem().Interface(), rinputMap.Interface())
+						}
+						if !reflect.DeepEqual(routStructAsMap.Elem().Interface(), rinputMap.Interface()) {
+							t.Errorf("source mismatch for %s: got: %#v expected: %#v\n", v.what, routStructAsMap.Elem().Interface(), rinputMap.Interface())
+						}
+						if !reflect.DeepEqual(routStruct.Elem().Interface(), rinputStruct.Interface()) {
+							t.Errorf("source mismatch for %s: got: %#v expected: %#v\n", v.what, routStruct.Elem().Interface(), rinputStruct.Interface())
+						}
+					})
+				}
+			}
+		})
 	}
 }
 func TestPrepareFreezeRoundtrip(t *testing.T) {
