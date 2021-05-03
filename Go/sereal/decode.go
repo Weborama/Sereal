@@ -753,7 +753,7 @@ func (d *Decoder) decodeViaReflection(by []byte, idx int, ptr reflect.Value) (in
 		if val, idx, err = d.decodeDouble(by, idx); err != nil {
 			return 0, err
 		}
-		ptr.SetFloat(val)
+		setFloat(ptr, val)
 
 	case tag == typeTRUE, tag == typeFALSE:
 		ptr.SetBool(tag == typeTRUE)
@@ -1212,6 +1212,16 @@ func setInt(ptr reflect.Value, i int) {
 		}
 	default:
 		panic(&reflect.ValueError{Method: "sereal.setInt", Kind: ptr.Kind()})
+	}
+}
+
+func setFloat(ptr reflect.Value, val float64) {
+	switch ptr.Kind() {
+	case reflect.Int64:
+		ptr.SetInt(int64(val))
+	default:
+		ptr.SetFloat(val)
+
 	}
 }
 
