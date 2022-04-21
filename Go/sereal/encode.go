@@ -582,12 +582,12 @@ func (e *Encoder) encodePointer(by []byte, rv reflect.Value, strTable map[string
 	// ikruglov
 	// I don't fully understand this logic, so leave it as is :-)
 
-	subkind := rv.Elem().Kind()
-	if e.StructAsMap && (subkind == reflect.Struct || subkind == reflect.Ptr) {
+	subKind := rv.Elem().Kind()
+	if e.StructAsMap && (subKind == reflect.Struct || subKind == reflect.Ptr) {
 		return e.encode(by, rv.Elem(), false, false, strTable, ptrTable)
 	}
 
-	if subkind == reflect.Struct {
+	if subKind == reflect.Struct {
 		switch rv.Elem().Interface().(type) {
 		case PerlRegexp:
 			return e.encode(by, rv.Elem(), false, false, strTable, ptrTable)
