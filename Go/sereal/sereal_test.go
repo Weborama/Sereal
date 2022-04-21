@@ -786,6 +786,11 @@ func TestStructAsMap(t *testing.T) {
 			AOmitTags{Name: "mr foo", Phone: "12345"},
 			map[string]interface{}{"name": "mr foo", "phone": "12345"},
 		},
+		{
+			"Interface",
+			&AOmitTags{Name: "mr foo", Phone: "12345"},
+			map[string]interface{}{"name": "mr foo", "phone": "12345"},
+		},
 	}
 
 	for _, compat := range []bool{false, true} {
