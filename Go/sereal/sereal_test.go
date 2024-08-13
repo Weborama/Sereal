@@ -361,6 +361,10 @@ func TestStructs(t *testing.T) {
 		Phone string `sereal:"phone,omitempty"`
 	}
 
+	type AStringPointer struct {
+		Pointer *string `sereal:"pointer,omitempty"`
+	}
+
 	type BInt int
 	type AInt struct {
 		B BInt
@@ -455,6 +459,12 @@ func TestStructs(t *testing.T) {
 			AOmitTags{Phone: "12345"},
 			AOmitTags{},
 			AOmitTags{Name: "", Phone: "12345"},
+		},
+		{
+			"string pointer",
+			AStringPointer{Pointer: &Afoo.Name},
+			AStringPointer{Pointer: &Afoo.Name},
+			AStringPointer{Pointer: &Afoo.Name},
 		},
 	}
 
