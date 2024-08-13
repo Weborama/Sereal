@@ -787,7 +787,11 @@ func (d *Decoder) decodeViaReflection(by []byte, idx int, ptr reflect.Value) (in
 		if val, idx, err = d.decodeBinary(by, idx+sz, ln, false); err != nil {
 			return 0, err
 		}
-		ptr.SetString(string(val))
+		if ptr.Kind() == reflect.Pointer && ptr.IsNil() {
+			ptr.Set(reflect.New(ptr.Type().Elem())) // assign nil pointer
+		}
+
+		reflect.Indirect(ptr).SetString(string(val))
 
 	case tag == typeHASH:
 		var ln, sz int
