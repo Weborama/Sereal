@@ -120,6 +120,7 @@ SRL_STATIC_INLINE void srl_read_weaken(pTHX_ srl_decoder_t *dec, SV* into);
 SRL_STATIC_INLINE void srl_read_long_double(pTHX_ srl_decoder_t *dec, SV* into);
 SRL_STATIC_INLINE void srl_read_double(pTHX_ srl_decoder_t *dec, SV* into);
 SRL_STATIC_INLINE void srl_read_float(pTHX_ srl_decoder_t *dec, SV* into);
+SRL_STATIC_INLINE void srl_read_float_128(pTHX_ srl_decoder_t *dec, SV* into);
 SRL_STATIC_INLINE void srl_read_string(pTHX_ srl_decoder_t *dec, int is_utf8, SV* into);
 SRL_STATIC_INLINE void srl_read_varint_into(pTHX_ srl_decoder_t *dec, SV* into, SV** container, const U8 *track_it);
 SRL_STATIC_INLINE void srl_read_zigzag_into(pTHX_ srl_decoder_t *dec, SV* into, SV** container, const U8 *track_it);
@@ -720,22 +721,6 @@ srl_read_header(pTHX_ srl_decoder_t *dec, SV *header_user_data)
 } STMT_END
 
 
-/* register a newly seen frozen object for THAWing later. */
-SRL_STATIC_INLINE void
-srl_track_frozen_object(pTHX_ srl_decoder_t *dec, HV *class_stash, SV *into)
-{
-    AV *info_av;
-    if (!dec->thaw_av)
-        SAFE_NEW_AV(dec->thaw_av);
-
-    AV_PUSH(dec->thaw_av, into);
-
-    if (!dec->ref_thawhash)
-        SAFE_PTABLE_NEW(dec->ref_thawhash);
-
-    PTABLE_store(dec->ref_thawhash, (void *)SvRV(into), (void *)class_stash);
-}
-
 
 /* Fetch or register a reference to an already seen frozen object.
  * Called during deserialization (push=1) to handle duplicate references
@@ -1062,6 +1047,9 @@ union myfloat {
     float f;
     double d;
     long double ld;
+#ifdef HAS_QUADMATH
+    __float128 nv;
+#endif
 };
 
 /* XXX Most (if not all?) non-x86 platforms are strict in their
@@ -1081,6 +1069,25 @@ srl_read_float(pTHX_ srl_decoder_t *dec, SV* into)
     sv_setnv(into, (NV)val.f);
     dec->buf.pos+= sizeof(float);
 }
+
+/* XXX Most (if not all?) non-x86 platforms are strict in their
+ * floating point alignment.  So maybe this logic should be the other
+ * way: default to strict, and do sloppy only if x86? */
+
+SRL_STATIC_INLINE void
+srl_read_float_128(pTHX_ srl_decoder_t *dec, SV* into)
+{
+#ifdef HAS_QUADMATH
+    union myfloat val;
+    SRL_RDR_ASSERT_SPACE(dec->pbuf, sizeof(NV), " while reading FLOAT");
+    Copy(dec->buf.pos,val.c,sizeof(NV),U8);
+    sv_setnv(into, (NV)val.nv);
+    dec->buf.pos += sizeof(NV);
+#else
+    SRL_RDR_ERROR(dec->pbuf, "FLOAT_128 not supported. No quadmath support in this perl.");
+#endif
+}
+
 
 
 SRL_STATIC_INLINE void
@@ -1646,10 +1653,32 @@ srl_read_object(pTHX_ srl_decoder_t *dec, SV* into, U8 obj_tag, int read_class_n
 SRL_STATIC_INLINE void
 srl_read_frozen_object(pTHX_ srl_decoder_t *dec, HV *class_stash, SV *into)
 {
-    const unsigned char *fixup_pos= dec->buf.pos + 1; /* get the tag for the WHATEVER */
+
+    AV *info_av;
+    if (!dec->thaw_av)
+        SAFE_NEW_AV(dec->thaw_av);
+
+    /* We do this BEFORE we call srl_read_single_value() so that
+       thaw_av contains the items in order of us seeing them in the serialized
+       dump. We will pop them off the list later on when we do the actual THAW.
+       Note that at the time we do this we haven't "filled out" the 'into' var
+       with the actual AV that is used for its frozen form. */
+
+    AV_PUSH(dec->thaw_av, into);
+
+    /* now fill out into with the AV that represents the object */
     srl_read_single_value(aTHX_ dec, into, NULL);
 
-    srl_track_frozen_object(aTHX_ dec, class_stash, into);
+    /* validate that we actually deparsed an AV */
+    assert(SvROK(into) && SvTYPE(SvRV(into)) == SVt_PVAV);
+
+    if (!dec->ref_thawhash)
+        SAFE_PTABLE_NEW(dec->ref_thawhash);
+
+    /* we need to do this *after* we have called srl_read_single_value() as
+       we use the address of the AV that into references as the key to find the
+       class stash. */
+    PTABLE_store(dec->ref_thawhash, (void *)SvRV(into), (void *)class_stash);
 }
 
 /* Invoke a THAW callback on the given class. Pass in the next item in the
@@ -1906,11 +1935,18 @@ srl_read_single_value(pTHX_ srl_decoder_t *dec, SV* into, SV** container)
         case SRL_HDR_ZIGZAG:        srl_read_zigzag_into(aTHX_ dec, into, container, track_it); break;
 
         case SRL_HDR_FLOAT:         srl_read_float(aTHX_ dec, into);                  break;
+
+        case SRL_HDR_FLOAT_128:     srl_read_float_128(aTHX_ dec, into);              break;
+
         case SRL_HDR_DOUBLE:        srl_read_double(aTHX_ dec, into);                 break;
+
         case SRL_HDR_LONG_DOUBLE:   srl_read_long_double(aTHX_ dec, into);            break;
 
-        case SRL_HDR_TRUE:          sv_setsv(into, &PL_sv_yes);                       break;
+        case SRL_HDR_NO:            /* fallthrough */
         case SRL_HDR_FALSE:         sv_setsv(into, &PL_sv_no);                        break;
+
+        case SRL_HDR_YES:           /* fallthrough */
+        case SRL_HDR_TRUE:          sv_setsv(into, &PL_sv_yes);                       break;
 
         case SRL_HDR_CANONICAL_UNDEF: /* fallthrough (XXX: is this right?)*/
         case SRL_HDR_UNDEF:

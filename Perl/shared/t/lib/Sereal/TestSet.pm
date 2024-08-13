@@ -82,11 +82,13 @@ our @EXPORT_OK= qw(
     integer short_string varint array array_fbit
     hash dump_bless
     have_encoder_and_decoder
+    check_for_dependency_issues
     run_roundtrip_tests
     write_test_files
     $use_objectv
     setup_tests
     _deep_cmp
+    _test_deep_cmp
     _test
     _cmp_str
 );
@@ -672,42 +674,38 @@ sub setup_tests {
 }
 
 sub have_encoder_and_decoder {
+    my $ret= check_for_dependency_issues(@_);
+    diag $ret if $ret;
+    return !$ret;
+}
+
+my %have_version;
+sub check_for_dependency_issues {
     my ($min_v)= @_;
+    foreach my $class ("Sereal::Encoder", "Sereal::Decoder") {
+        eval "use $class; 1" or next;
+        $have_version{$class} = $class->VERSION;
+    }
+    my $Other = ($Class eq "Sereal::Decoder")
+                ? "Sereal::Encoder"
+                : "Sereal::Decoder";
 
-    # $Class is the already-loaded class, so the one we're testing
-    my @need=
-          $Class =~ /Encoder/ ? ("Decoder")
-        : $Class =~ /Decoder/ ? ("Encoder")
-        :                       ( "Encoder", "Decoder" );
-    my @need_class= ( $Class, map { "Sereal::$_" } @need );
+    my $this_version = $have_version{$Class}
+        or die "panic: No version for the module ($Class) we are building?";
 
-    foreach my $class (@need_class) {
-        eval "use $class; 1"
-            or do {
-            note( "Could not locate $class for testing" . ( $@ ? " (Exception: $@)" : "" ) );
-            return ();
-            };
-        my $cmp_v= $class->VERSION;
+    my $other_version = $have_version{$Other}
+        or return "No $Other available to test with.";
 
-        if ( $min_v and $cmp_v < $min_v ) {
-            diag(     "Could not load correct version of $class for testing "
-                    . "(got: $cmp_v, needed at least $min_v)" );
-            return;
-        }
-
-        $cmp_v =~ s/_//;
-        $cmp_v= sprintf( "%.2f", int( $cmp_v * 100 ) / 100 );
-        my %compat_versions= map { $_ => 1 } $Class->_test_compat();
-        if ( not defined $cmp_v or not exists $compat_versions{$cmp_v} ) {
-            diag(     "Could not load correct version of $class for testing "
-                    . "(got: $cmp_v, needed any of "
-                    . join( ", ", keys %compat_versions )
-                    . ")" );
-            return ();
+    if (!$min_v and $0 =~ m!/v(\d+)/!) {
+        $min_v= $1;
+        if ($Config{usequadmath} || $Config{uselongdouble}) {
+            $min_v= 5;
         }
     }
-
-    return 1;
+    if ($min_v and $other_version < $min_v) {
+        return "This test requires version $min_v for $Other but we have version $other_version";
+    }
+    return "";
 }
 
 # max iv/uv logic taken from Storable tests
@@ -1042,12 +1040,10 @@ sub run_roundtrip_tests {
     }
 
     my $suffix= "_v$proto_version";
+    # older v2.x and v1.0 should ingore this.
+    $opts->{protocol_version}= $proto_version;
     if ( $proto_version == 1 ) {
         $opts->{use_protocol_v1}= 1;
-    }
-    else {
-        # v2 ignores this, but will output v2 by default
-        $opts->{protocol_version}= $proto_version;
     }
     setup_tests($proto_version);
     run_roundtrip_tests_internal( $name . $suffix, $opts );
@@ -1150,6 +1146,11 @@ sub _cmp_str {
     return $ret;
 }
 
+our $deep_cmp_name; # set by deep_cmp()
+sub _test_deep_cmp {
+    local $deep_cmp_name= "_test_deep_cmp";
+    return _deep_cmp(@_);
+}
 sub _deep_cmp {
     my ( $x, $y, $seenx, $seeny )= @_;
     $seenx ||= {};
@@ -1205,7 +1206,20 @@ sub _deep_cmp {
             die "Unknown reftype '", reftype($x) . "'";
         }
     }
-    else {
+    else{
+        if (
+            $deep_cmp_name !~ /v5/ and $deep_cmp_name =~ /float/
+            and $x=~/^-?\d+\.\d+\z/ and $y=~/^-?\d+\.\d+\z/
+        ) {
+            if ($deep_cmp_name=~/(-?\d+\.(\d+))/) {
+                my $maxf= length $1;
+                my $minf= length $2;
+                $_= sprintf "%*.*f", $maxf, $minf, $_
+                    for $x, $y;
+            } else {
+                $_= sprintf "%f", $_ for $x, $y;
+            }
+        }
         $cmp= _cmp_str( $x, $y )
             and return $cmp;
     }
@@ -1214,6 +1228,7 @@ sub _deep_cmp {
 
 sub deep_cmp {
     my ( $v1, $v2, $name )= @_;
+    local $deep_cmp_name= $name;
     my $diff= _deep_cmp( $v1, $v2 );
     if ($diff) {
         my ( $reason, $diag )= split /\n/, $diff, 2;
