@@ -463,7 +463,13 @@ func TestStructs(t *testing.T) {
 		{
 			"string pointer",
 			AStringPointer{Pointer: &Afoo.Name},
+			AStringPointer{Pointer: new(string)},
 			AStringPointer{Pointer: &Afoo.Name},
+		},
+		{
+			"string pointer unset",
+			AStringPointer{Pointer: &Afoo.Name},
+			AStringPointer{},
 			AStringPointer{Pointer: &Afoo.Name},
 		},
 	}
