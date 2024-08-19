@@ -106,13 +106,20 @@ sub parse_header {
         my $out= Compress::Zlib::uncompress($data);
         $data= $out;
     }
+    elsif ( $encoding == SRL_PROTOCOL_ENCODING_ZSTD ) {
+        print "Header says: Document body is ZSTD-compressed.\n";
+        my $compressed_len= varint();
+        require Compress::Zstd;
+        my $out= Compress::Zstd::decompress($data);
+        $data= $out;
+    }
     else {
         die "Invalid encoding '" . ( $encoding >> SRL_PROTOCOL_VERSION_BITS ) . "'";
     }
     $hlen= length($done);
 }
 
-my ( $len_f, $len_d, $len_D );
+my ( $len_f, $len_d, $len_D, $len_F );
 
 sub parse_float {
     $len_f ||= length( pack( "f", 0 ) );
@@ -120,6 +127,14 @@ sub parse_float {
     $done .= $v;
     return unpack( "f", $v );
 }
+
+sub parse_float_128 {
+    $len_F ||= length( pack( "F", 0 ) );
+    my $v= _chop_data_prefix($len_F);
+    $done .= $v;
+    return unpack( "F", $v );
+}
+
 
 sub parse_double {
     $len_d ||= length( pack( "d", 0 ) );
@@ -189,6 +204,9 @@ sub parse_sv {
     }
     elsif ( $o == SRL_HDR_LONG_DOUBLE ) {
         printf "LONG_DOUBLE(%f)\n", parse_long_double();
+    }
+    elsif ( $o == SRL_HDR_FLOAT_128 ) {
+        printf "FLOAT_128(%f)\n", parse_float_128();
     }
     elsif ( $o == SRL_HDR_REFN ) {
         printf "REFN\n";

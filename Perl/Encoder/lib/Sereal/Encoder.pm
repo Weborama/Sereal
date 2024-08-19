@@ -5,13 +5,8 @@ use warnings;
 use Carp qw/croak/;
 use XSLoader;
 
-our $VERSION= '4.018'; # Don't forget to update the TestCompat set for testing against installed decoders!
+our $VERSION= '5.004';
 our $XS_VERSION= $VERSION; $VERSION= eval $VERSION;
-
-# not for public consumption, just for testing.
-( my $num_version= $VERSION ) =~ s/_//;
-my $TestCompat= [ map sprintf( "%.2f", $_ / 100 ), reverse( 400 .. int( $num_version * 100 ) ) ]; # compat with 4.00 to ...
-sub _test_compat { return ( @$TestCompat, $VERSION ) }
 
 # Make sure to keep these constants in sync with the C code in srl_encoder.c.
 # I know they could be exported from C using things like ExtUtils::Constant,
@@ -436,6 +431,15 @@ but at the cost of potential action at a distance due to the aliasing.
 I<Beware:> The test suite currently does not cover this option as well as it
 probably should. Patches welcome.
 
+=head3 use_standard_double
+
+This option can be used to force Perls built with uselongdouble or quadmath
+to use DOUBLE instead of the native floating point. This can be helpful
+interoperating with Perls which do not support larger sized floats. Note
+that "uselongdouble" means different things in different places, so this
+option may be helpful for such builds. We do not enable this option by default
+for backwards compatibility reasons, and because doing so would lose precision.
+
 =head3 protocol_version
 
 Specifies the version of the Sereal protocol to emit. Valid are integers
@@ -534,19 +538,20 @@ in both time and space efficiency with the best alternatives.
 
 =head1 FREEZE/THAW CALLBACK MECHANISM
 
-This mechanism is enabled using the C<freeze_callbacks> option of the encoder.
-It is inspired by the equivalent mechanism in L<CBOR::XS> and differs only
-in one minor detail, explained below. The general mechanism is documented
-in the I<A GENERIC OBJECT SERIALIATION PROTOCOL> section of L<Types::Serialiser>.
-Similar to CBOR using C<CBOR>, Sereal uses the string C<Sereal> as a serializer
-identifier for the callbacks.
+Some objects do not lend themselves naturally to naive perl
+datastructure level serialization. For instance XS code might use a
+hidden structure that would not get serialized, or an object may contain
+volatile data like a filehandle that would not be reconstituted
+properly. To support cases like this C<Sereal> supports a FREEZE and
+THAW api. When objects are serialized their FREEZE method is asked for a
+replacement representation, and when objects are deserialized their THAW
+method is asked to convert that replacement back to something useful.
 
-The one difference to the mechanism as supported by CBOR is that in Sereal,
-the C<FREEZE> callback must return a single value. That value can be any
-data structure supported by Sereal (hopefully without causing infinite recursion
-by including the original object). But C<FREEZE> can't return a list as with CBOR.
-This should not be any practical limitation whatsoever. Just return an array
-reference instead of a list.
+This mechanism is enabled using the C<freeze_callbacks> option of the encoder.
+It is inspired by the equivalent mechanism in L<CBOR::XS>. The general mechanism
+is documented in the I<A GENERIC OBJECT SERIALIATION PROTOCOL> section of
+L<Types::Serialiser>. Similar to CBOR using C<CBOR>, Sereal uses the string
+C<Sereal> as a serializer identifier for the callbacks.
 
 Here is a contrived example of a class implementing the C<FREEZE> / C<THAW> mechanism.
 
@@ -845,6 +850,13 @@ which have string and integer values which are completely unrelated to each othe
 Sereal currently will choose the *string* value when it detects these items.
 
 It is possible that a future release of the protocol will fix these issues.
+
+=item Booleans
+
+As of Perl 5.36 and protocol version 5 Sereal now supports booleans. The new
+tags SRL_HDR_YES and SRL_HDR_NO now represent perl bools, the old special
+variables that SRL_HDR_TRUE and SRL_HDR_FALSE may still be generated, but beyond
+being readonly these are equivalent to SRL_HDR_YES and SRL_HDR_NO.
 
 =back
 

@@ -85,6 +85,9 @@ sub check_external_libraries {
     my ( $libs, $defines, $objects, $subdirs )= @_;
     require Devel::CheckLib;
 
+    $$libs .= ' -L/usr/local/lib'
+        if $^O =~ /openbsd/;
+
     if (
            !$ENV{SEREAL_USE_BUNDLED_LIBS}
         && !$ENV{SEREAL_USE_BUNDLED_CSNAPPY}
@@ -145,6 +148,13 @@ sub build_defines {
             grep { exists $ENV{$_} } ( qw(NOINLINE DEBUG MEMDEBUG NDEBUG), @defs ) );
 
     $defines .= " -DNDEBUG" unless $ENV{DEBUG};
+
+    if ($Config{usequadmath}) {
+        $defines .= " -DHAS_QUADMATH";
+    } elsif ($Config{uselongdouble}) {
+        $defines .= " -DHAS_LONGDOUBLE";
+    }
+
     if ( $Config{osname} eq 'hpux' && not $Config{gccversion} ) {
 
         # HP-UX cc does not support inline.
@@ -154,6 +164,12 @@ sub build_defines {
         # the one that was used to compile Perl,
         # so we just fake the inline away.
         $defines .= " -Dinline= ";
+    }
+
+    $defines .= " -DMINIZ_NO_STDIO";
+    if ($ENV{USE_UNALIGNED}) {
+        $defines .= " -DMINIZ_USE_UNALIGNED_LOAD_AND_STORE=1";
+        $defines .= " -DMINIZ_UNALIGNED_USE_MEMCOPY";
     }
 
     return $defines;
@@ -178,7 +194,14 @@ sub build_optimize {
             $gccversion= $1;
         }
 
-        if ( $catch_violations && ( $clang || $gccversion >= 4.3 ) ) {
+        if ( $] < 5.035005 && $catch_violations && ( $clang || $gccversion >= 4.3 ) ) {
+
+            # v5.35.5 enables some C99 features including mixed declarations and code,
+            # and uses them in inline.h, hence we can't enable this warning flag
+            # without generating false positive warnings.
+            # Earlier versions of perl support older compilers that are strict C89,
+            # hence we still need to avoid mixed declarations and code, hence
+            # enable this warning on earlier perls so that we can still spot problems.
 
             # -Werror= introduced in GCC 4.3
             # For trapping C++ // comments we would need -std=c89 (aka -ansi)
@@ -202,6 +225,10 @@ sub build_optimize {
             $OPTIMIZE .= ' -Weverything' if ( $ENV{DEBUG} > 6 && $clang );    # really not pretty
         }
     }
+
+    # silence warning about STMT_START and STMT_END.
+    $OPTIMIZE .= " -Wno-compound-token-split-by-macro"
+        if $clang;
 
     return $OPTIMIZE;
 }
@@ -240,6 +267,13 @@ sub WriteMakefile {
     delete $params{OPTIMIZE}         if $^O eq 'MSWin32';
 
     ExtUtils::MakeMaker::WriteMakefile(%params);
+}
+
+sub MY::postamble {
+  return <<'MAKE_FRAG';
+zstd/libzstd$(OBJ_EXT): zstd/Makefile
+	cd zstd && $(MAKE) all
+MAKE_FRAG
 }
 
 1;

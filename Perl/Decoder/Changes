@@ -1,10 +1,109 @@
 Revision history for Perl extension Sereal-Decoder
 
 ****************************************************************
-* Warning: For a seamless upgrade, upgrade to version 4        *
-*          of the decoder before upgrading to version 4 of the *
+* Warning: For a seamless upgrade, upgrade to version 5        *
+*          of the decoder before upgrading to version 5 of the *
 *          encoder!                                            *
 ****************************************************************
+5.004
+    * Fix thaw ordering for frozen objects. Nested THAW operations
+      now happen in the documented LIFO order. Thanks to Marco
+      Fontani for the report.
+
+5.003
+    * Production release of 5.002_001 and 5.002_002
+    * OpenBSD build fixes. Gracious thanks to Andrew Hewus Fresh
+      for providing guidance and access to an OpenBSD box to use to
+      debug and fix this.
+    * Update Miniz to 3.0.2, Zstd to 1.5.2 and Devel::CheckLib to 1.16
+    * Assorted build fixes related to these updates.
+    
+5.002_002
+    * OpenBSD build fixes. Gracious thanks to Andrew Hewus Fresh
+      for providing guidance and access to an OpenBSD box to use to
+      debug and fix this.
+
+5.002_001
+    * Update Miniz to 3.0.2, Zstd to 1.5.2 and Devel::CheckLib to 1.16
+    * Assorted build fixes related to these updates.
+
+5.002
+    * Fixup Decoder tests to run on perl 5.8 which has no defined-or.
+    - Consolidated changes from 5.001_00x:
+    * Ensure that Encoder depends on the correct version of the Decoder.
+      Gracious thanks to Slaven Rezic for being so patient in helping
+      me get this release working properly.
+    * Test compatibility fixes when no perl is already installed.
+    * Add t/195_backcompat.t to check if the latest decoder will
+      seamlessly handle reading output from older versions.
+    * Test compatibility fixes with version 3 and earlier.
+
+5.001_003
+    * Ensure that Encoder depends on the correct version of the Decoder.
+      Gracious thanks to Slaven Rezic for being so patient in helping
+      me get 5.001_00x working properly.
+
+5.001_002
+    * Test compatibility fixes when no perl is already installed.
+    * Add t/195_backcompat.t to check if the latest decoder will
+      seamlessly handle reading output from older versions. 
+
+5.001_001
+    * Test compatibility fixes with version 3 and earlier.
+
+5.001
+    * First official release of protocol 5. Better support for non
+      standard NV types. Support for the new Perl 5.36 bools.
+      Upgrade *Sereal::Decoder* FIRST.
+
+5.000_002
+    * Prerelease CPAN testing. Build fixes for quadmath and
+      longdouble perls. Certain tests were failing with the old
+      versions which were subtly broken on quadmath or longdouble
+      machines. These tests are now skipped on these builds. You
+      will not be able to fully test this platform until you install
+      the Decoder, and then install the Encoder.
+
+5.000_001
+    * Prerelease CPAN testing for 5.000_000.
+
+5.000_000 Tue Aug 30, 2022
+    * Support quadmath builds with FLOAT_128 tag type.
+    * Support YES/NO tags for booleans. Requires perl 5.36.
+
+---
+
+4.025 Thr Jul 28, 2022
+    * Release with build fixes for threaded perls and MANIFEST
+      update. Oops.
+
+4.024 Wed Jul 27, 2022
+    * Total rework of how THAW is invoked to resolve issues with
+      frozen representations containing blessed objects.
+
+
+4.023 Sun Feb 20, 2022
+    * Make it possible to upgrade with passing tests when using
+      Sereal::Decoder 4.015 - 4.019 on threaded debugging perls.
+
+      IF YOU USE THREADED PERLS YOU ARE STRONGLY ADVISED TO UPDATE
+      TO THIS VERSION OR LATER. *UPGRADE THE DECODER IMMEDIATELY.*
+
+4.022 Sat Feb 19, 2022
+4.021 Fri Feb 18, 2022
+    * Early but incomplete versions of 4.023, skip these releases.
+
+4.020 Thurs Feb 17, 2022
+    * Fix "panic: free from wrong pool" errors on threaded builds.
+      This error is only visible on DEBUGGING perls however it exists
+      regardless. If you are using a threaded build upgrade to this!
+      Thanks to Andreas J. Koenig for finding the bug, and Nicholas Clark
+      for suggesting valgrind to debug and fix it.
+
+4.019 Mon Feb 7, 2022
+    * Fix build issue with latest perl - Thanks to Nicholas Clark
+    * Update zstd to 1.5.1
+
 4.018 Thurs Aug 3, 2020
     * Fix issue with gcc 10 with snappy compression.
 
@@ -177,4 +276,3 @@ Revision history for Perl extension Sereal-Decoder
     where numeric and string equivalence may differ)
 
 Full change history available at https://github.com/Sereal/Sereal
-
